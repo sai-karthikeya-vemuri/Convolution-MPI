@@ -77,20 +77,22 @@ for(int x = 0; x<rows;++x)
  return output;
 }
 
-std::vector<std::vector<int>> Convolute_Parallel()
+std::vector<std::vector<int>> Convolute_Parallel(int rank,int p)
 {
-    int rank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    int p;
-    MPI_Comm_size(MPI_COMM_WORLD, &p);
+    //int rank;
+    //MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    //int p;
+    //MPI_Comm_size(MPI_COMM_WORLD, &p);
 	
 
 	MPI_Barrier(MPI_COMM_WORLD);
 	
-	if(p==1 || p>rows)
-		return Convolute_Serial();
+	if(p==1 || p>rows){
+	        std::cout<<"Serial done";
+		return Convolute_Serial();}
         else
 	{
+	std::cout<<"In else ";
 	int rows_p = rows/p;
 	int temp_array[rows][columns];
 	    for (int i =0; i < rows; ++i)
@@ -100,7 +102,7 @@ std::vector<std::vector<int>> Convolute_Parallel()
                     temp_array[i][j] = image[i][j];
                   }
                }
-	
+	std::cout<<"Temp array copied succesfully";
 	int dest1, dest2, src1, src2;                 
         int recHalo1[columns], recHalo2[columns];      
         int sendHalo1[columns], sendHalo2[columns];       
@@ -110,17 +112,18 @@ std::vector<std::vector<int>> Convolute_Parallel()
         int FinalMatrix [rows][columns]; 
 	
         MPI_Scatter(temp_array, rows_p*columns, MPI_INT, 
-        &matrixHalo, rows_p*columns, MPI_INT, 0, MPI_COMM_WORLD);
+        &matrixHaloArr, rows_p*columns, MPI_INT, 0, MPI_COMM_WORLD);
         
-	
+	std::cout<<"Done scattering";
 	MPI_Request requestHandle[2];
         
        
         for (int i = 0; i < columns; i++){
-            sendHalo1[i] = matrixHalo[0][i];
-            sendHalo2[i] = matrixHalo[rows_p - 1][i];
+            sendHalo1[i] = matrixHaloArr[0][i];
+            sendHalo2[i] = matrixHaloArr[rows_p - 1][i];
+	    
         }    
-       
+        std::cout<<"Done Halo";
         if (p == 1) {//if there is only 1 process
             dest1 = 0;
             dest2 = 0;
@@ -153,17 +156,28 @@ std::vector<std::vector<int>> Convolute_Parallel()
         MPI_Irecv(&recHalo2, columns, MPI_INT, src2, 111, MPI_COMM_WORLD, &requestHandle[0]);
         MPI_Waitall(2, requestHandle, MPI_STATUSES_IGNORE);
         
+	std::cout<<"Done isend and irecv";
 	
 	
-        matrixHalo.resize(rows_p + 2, std::vector<int>(columns, 0));
+	matrixHalo.resize(rows_p + 2, std::vector<int>(columns, 0));
         //convProcMatrix.resize(rows_p, std::vector<int>(columns, 0));
-        
-        for (int i = 0; i < columns; i++){
-            matrixHalo[0][i] = recHalo1[i];
-            matrixHalo[rows_p+1][i] = recHalo2[i];
+        for(int row=0;row<rows_p+2;row++){
+          
+	  for (int i = 0; i < columns; i++){
+             if(row==0){
+	     matrixHalo[0][i] = recHalo1[i];
+	     }
+	     
+	  else if(row==rows_p+1){
+             matrixHalo[rows_p+1][i] = recHalo2[i];
+	     }
+	  else{
+	  matrixHalo[row][i]=matrixHaloArr[row-1][i];
+	  }
         }
+	}
 	int a,b,indexr,indexc;
-	int sum;
+	float sum;
 	for(int x = 1; x<rows_p-1;++x)
         {
           for(int y=0; y<columns;++y) 
@@ -171,7 +185,7 @@ std::vector<std::vector<int>> Convolute_Parallel()
             sum=0;
             for(int i=0;i<3;++i)
              {
-              for(int j=0;j<3;j++)
+              for(int j=0;j<3;++j)
                {
                 a = x +i -1;
                 b = y+j -1;
@@ -187,9 +201,12 @@ std::vector<std::vector<int>> Convolute_Parallel()
            }
    
        } 
+       std::cout<<"Done convolution process";
         MPI_Gather(&convProcMatrix, rows_p*columns, MPI_INT, FinalMatrix,rows_p*columns , MPI_INT, 0, MPI_COMM_WORLD);
         MPI_Barrier(MPI_COMM_WORLD);
+	
         if(rank==0){
+	  std::cout<<"Done gathering";
 	  for(int i = 0;i<rows;++i){
 	   for(int j=0;j<columns;++j){
 	     output[i][j] = FinalMatrix[i][j];
@@ -236,8 +253,8 @@ int main(int argc,char **argv)
   	MPI_Init(&argc,&argv);
 	int rank;
     int pcom;
-    //MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    //MPI_Comm_size(MPI_COMM_WORLD, &pcom);
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &pcom);
   
 
 
@@ -288,12 +305,12 @@ int main(int argc,char **argv)
     };
 //Task 1:Edge
 
-Convolution C(array,edge,numrows,numcols);
+Convolution C(array,blur,numrows,numcols);
 
-array=C.Convolute_Parallel();
+array=C.Convolute_Parallel(rank,pcom);
 
-std::string oname="512_parallel.pgm";
-//C.create_ofile(oname);
+std::string oname="512_parallel_blur.pgm";
+C.create_ofile(oname);
 
 
 
