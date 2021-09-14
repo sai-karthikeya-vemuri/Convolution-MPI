@@ -1,3 +1,15 @@
+/*
+High performance computing :Project - Convolution of an Image using MPI
+NAme: Sai Karthikeya Vemuri
+Matrikel Nr: 65124
+
+Professor in charge: Dr.Oliver Rheinbach
+
+*/
+
+
+
+//Include all the headers
 #include <iostream>
 #include <cstdlib>
 #include <fstream>
@@ -7,7 +19,15 @@
 
 class Convolution
 {
+/*
+Implementation of convolution as a class
+*/
 private:
+//private data members, for every convolution object, there is a need of five data holders
+//image : 2d vector in which the image is stored
+//kernel: The kernel operation matrix
+//output: The output result of convolution
+//rows,columns: number of pixels of image
 std::vector<std::vector<int>> image;
 std::vector<std::vector<float>> kernel;
 std::vector<std::vector<int>> output;
@@ -16,7 +36,7 @@ int rows;
 int columns;
 
 public:
-
+//constructor to initialize data variables
 Convolution(std::vector<std::vector<int>> image_input,std::vector<std::vector<float>> kernel_input,int rows,int columns)
   : rows(rows),columns(columns)
 {
@@ -28,6 +48,7 @@ output.resize(rows, std::vector<int>(columns,0));
 }
 int index_number(int a, int max)
 {
+//This function takes in a relative number in kernel operation and max number in that dimension and gives an index according to periodic boundary condition
     int index;
     if (a < 0){
         index = max + a;
@@ -42,6 +63,7 @@ int index_number(int a, int max)
 }
 std::vector<std::vector<int>> Convolute_Serial()
 {
+//This method does convolution operation in serial manner and outputs the result
 int indexr,indexc,a,b;
 float sum;
 
@@ -79,6 +101,9 @@ for(int x = 0; x<rows;++x)
 
 std::vector<std::vector<int>> Convolute_Parallel()
 {
+//This method does convolution using MPI processes.
+// The 2d array is scattered into chunks of smaller arrays to processes from root and halo rows are communicated through Isend and Irecv
+//Convolution is done for these smaller chunks and gathered at root again to get the final matrix after convolution
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     int p;
@@ -211,6 +236,7 @@ std::vector<std::vector<int>> Convolute_Parallel()
 
 void create_ofile(std::string& ofilename)
 {
+//Method to write a 2d vector to a pgm file
     std::ofstream  outfile(ofilename);
     if(outfile.is_open())
     {
@@ -226,20 +252,22 @@ void create_ofile(std::string& ofilename)
     }
     outfile.close();
 }
-
+//Destructor
 ~Convolution() {}
 
 };
-
+//Main function, execution starts here
 int main(int argc,char **argv)
 {
   	MPI_Init(&argc,&argv);
 	int rank;
     int pcom;
+    double t1, t2; 
+    t1 = MPI_Wtime(); 
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &pcom);
     
-    int row = 0, col = 0, numrows = 512, numcols = 512, greyval = 255;
+    int row = 0, col = 0, numrows =512 , numcols = 512, greyval = 255;
     std::vector<std::vector<int>> array;
     array.resize(numrows, std::vector<int>(numcols,0));
     if(rank==0){
@@ -266,6 +294,7 @@ int main(int argc,char **argv)
     std::cout<<"The file is read only in root"<<"/n";
     infile.close(); 
     }
+    //Define kernels
     std::vector<std::vector<float>> blur
     {
         {0.0625,0.125,0.0625},
@@ -292,12 +321,14 @@ int main(int argc,char **argv)
     };
     //Task 1:Edge
   
-    Convolution C(array,edge,numrows,numcols);
+    Convolution C(array,blur,numrows,numcols);
 
     array=C.Convolute_Parallel();
     if(rank == 0){
-        std::string oname="512_parallel_edge.pgm";
+        std::string oname="512_parallel_blur.pgm";
         C.create_ofile(oname);
+	t2 = MPI_Wtime(); 
+printf( "Elapsed time is %f\n", t2 - t1 ); 
     }
 
 
@@ -320,7 +351,9 @@ C1.create_ofile(oname);
 }
 }
 */
+    
     MPI_Finalize();
+ 
     return 0;
 }
 
